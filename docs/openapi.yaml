@@ -1,0 +1,162 @@
+openapi: 3.1.0
+info:
+  title: StreamFlix API
+  version: 1.0.0
+  description: API REST pour comptes, profils, facturation, playback autorisé et signalement de droits.
+servers:
+  - url: http://localhost:3000
+    description: Développement local
+paths:
+  /api/auth/register:
+    post:
+      summary: Créer un compte et une première session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12, maxLength: 128 }
+                profileName: { type: string, maxLength: 40 }
+      responses:
+        "201": { description: Compte créé; cookies de session HttpOnly définis. }
+        "409": { description: Adresse e-mail déjà utilisée. }
+        "429": { description: Limite de création atteinte. }
+  /api/auth/login:
+    post:
+      summary: Ouvrir une session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200": { description: Session ouverte; cookies de session HttpOnly définis. }
+        "401": { description: Identifiants invalides. }
+  /api/auth/refresh:
+    post:
+      summary: Renouveler et faire tourner le refresh token
+      responses:
+        "200": { description: Session renouvelée; nouveaux cookies HttpOnly définis. }
+        "401": { description: Refresh token absent, expiré ou déjà consommé. }
+  /api/auth/logout:
+    post:
+      summary: Révoquer le refresh token courant
+      responses:
+        "200": { description: Session révoquée et cookies effacés. }
+  /api/account:
+    get:
+      security: [{ sessionCookie: [] }]
+      summary: Lire le compte, les profils et l’abonnement courant
+      responses:
+        "200": { description: Compte courant. }
+        "401": { description: Authentification requise. }
+  /api/profiles:
+    post:
+      security: [{ sessionCookie: [] }]
+      summary: Ajouter un profil (maximum cinq)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 40 }
+                isKids: { type: boolean }
+      responses:
+        "201": { description: Profil créé. }
+        "409": { description: Limite de profils atteinte. }
+  /api/profiles/{profileId}:
+    delete:
+      security: [{ sessionCookie: [] }]
+      summary: Supprimer un profil du compte courant
+      parameters:
+        - in: path
+          name: profileId
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Profil supprimé. }
+        "409": { description: Le compte doit conserver au moins un profil. }
+  /api/billing/checkout:
+    post:
+      security: [{ sessionCookie: [] }]
+      summary: Créer une session Stripe Checkout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan]
+              properties:
+                plan: { type: string, enum: [STANDARD, PREMIUM] }
+      responses:
+        "200": { description: URL de redirection Stripe. }
+        "503": { description: Identifiants ou tarifs Stripe non configurés. }
+  /api/billing/portal:
+    post:
+      security: [{ sessionCookie: [] }]
+      summary: Créer une session de portail de facturation Stripe
+      responses:
+        "200": { description: URL du portail Stripe. }
+        "404": { description: Aucun client Stripe lié à ce compte. }
+  /api/billing/webhook:
+    post:
+      summary: Recevoir un événement Stripe signé
+      parameters:
+        - in: header
+          name: Stripe-Signature
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Événement traité ou ignoré. }
+        "400": { description: Signature invalide. }
+  /api/video/{assetId}/token:
+    post:
+      security: [{ sessionCookie: [] }]
+      summary: Obtenir une URL CDN signée pour un asset prêt et autorisé
+      parameters:
+        - in: path
+          name: assetId
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: URL de diffusion valide pendant cinq minutes. }
+        "403": { description: Niveau d’abonnement insuffisant. }
+        "404": { description: Asset absent ou non publié. }
+  /api/rights/report:
+    post:
+      summary: Déposer un signalement de droits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contactEmail, rightsHolderName, contentUrl, details, consent]
+              properties:
+                contactEmail: { type: string, format: email }
+                rightsHolderName: { type: string, maxLength: 160 }
+                contentUrl: { type: string, format: uri }
+                details: { type: string, minLength: 30, maxLength: 5000 }
+                consent: { type: boolean, const: true }
+      responses:
+        "201": { description: Signalement sauvegardé avec référence. }
+        "429": { description: Limite horaire atteinte. }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: sf_access

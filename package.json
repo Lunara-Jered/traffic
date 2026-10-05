@@ -1,0 +1,24 @@
+{
+  "name": "streamflix",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev --workspace @streamflix/web",
+    "build": "npm run build --workspace @streamflix/web",
+    "typecheck": "npm run typecheck --workspace @streamflix/web",
+    "test": "npm run test --workspace @streamflix/web",
+    "test:e2e": "npm run test:e2e --workspace @streamflix/web",
+    "db:generate": "prisma generate --schema packages/database/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema packages/database/prisma/schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema packages/database/prisma/schema.prisma",
+    "db:seed": "prisma db seed --schema packages/database/prisma/schema.prisma"
+  },
+  "overrides": {
+    "deepmerge-ts": "$deepmerge-ts",
+    "postcss": "^8.5.29"
+  },
+  "devDependencies": {
+    "deepmerge-ts": "8.0.2"
+  },
+  "engines": { "node": ">=20.9" }
+}
